@@ -1,0 +1,15 @@
+# Local/private settings
+settings.json
+*.local.json
+.env
+.env.*
+
+# Generated scan output
+credits_scan/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# macOS
+.DS_Store

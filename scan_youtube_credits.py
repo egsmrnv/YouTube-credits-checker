@@ -11,7 +11,7 @@ from pathlib import Path
 
 
 DEFAULT_PLAYLIST = "https://www.youtube.com/playlist?list=PL4FeNajyKrkY04-0symLYag8LxSy7fZ-K"
-DEFAULT_NAMES = ["Егор Смирнов", "Аурика Боготова"]
+DEFAULT_CONFIG = "settings.json"
 
 
 def run(cmd, *, capture=False, check=True):
@@ -67,6 +67,39 @@ def fuzzy_contains(text, target, threshold):
             best = max(best, SequenceMatcher(None, candidate, target).ratio())
 
     return best if best >= threshold else 0.0
+
+
+def load_config(path):
+    config_path = Path(path)
+    if not config_path.exists():
+        return {}
+
+    try:
+        data = json.loads(config_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Cannot read config {config_path}: {exc}") from exc
+
+    if not isinstance(data, dict):
+        raise ValueError(f"Config {config_path} must contain a JSON object.")
+    return data
+
+
+def get_names(args):
+    if args.names:
+        return args.names
+
+    config = load_config(args.config)
+    names = config.get("names", [])
+    if not isinstance(names, list) or not all(isinstance(name, str) for name in names):
+        raise ValueError(f'Config {args.config} must contain "names": ["Name One", "Name Two"].')
+
+    names = [name.strip() for name in names if name.strip()]
+    if names:
+        return names
+
+    raise ValueError(
+        "No names configured. Add names to settings.json or pass --name multiple times."
+    )
 
 
 def get_playlist_items(playlist_url, cache_path):
@@ -247,6 +280,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Ищет имена в титрах YouTube-плейлиста через OCR последних минут.")
     parser.add_argument("--playlist", default=DEFAULT_PLAYLIST)
     parser.add_argument("--name", dest="names", action="append", default=[], help="Имя для поиска. Можно указать несколько раз.")
+    parser.add_argument("--config", default=DEFAULT_CONFIG, help="JSON-файл с настройками. По умолчанию settings.json.")
     parser.add_argument("--out", default="credits_scan")
     parser.add_argument("--limit", type=int, default=0, help="Сколько первых видео проверить. 0 = все.")
     parser.add_argument("--offset", type=int, default=0, help="Сколько видео пропустить с начала.")
@@ -261,7 +295,7 @@ def parse_args():
 
 def main():
     args = parse_args()
-    args.names = args.names or DEFAULT_NAMES
+    args.names = get_names(args)
     require_tools()
     if args.check:
         print("Все нужные утилиты найдены.")
